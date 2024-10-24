@@ -3,18 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generador de QR Personalizado</title>
+    <title>Generador de Múltiples QR Personalizados</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-dark text-light">
     <div class="container mt-5">
-        <h1 class="text-center">Generador de Código QR Personalizado</h1>
+        <h1 class="text-center">Generador de Múltiples Códigos QR</h1>
         <div class="row justify-content-center mt-4">
             <div class="col-md-6">
                 <form method="POST" action="/">
                     <div class="mb-3">
-                        <label for="url" class="form-label">Introduce una URL</label>
-                        <input type="text" class="form-control" id="url" name="url" placeholder="https://example.com" required>
+                        <label for="urls" class="form-label">Introduce hasta 5 URLs (una por línea)</label>
+                        <textarea class="form-control" id="urls" name="urls" rows="5" placeholder="https://example.com" required></textarea>
                     </div>
                     <div class="mb-3">
                         <label for="fill_color" class="form-label">Color del Código QR</label>
@@ -29,22 +29,27 @@
                             {{ error }}
                         </div>
                     {% endif %}
-                    <button type="submit" class="btn btn-primary w-100">Generar Código QR</button>
+                    <button type="submit" class="btn btn-primary w-100">Generar Códigos QR</button>
                 </form>
             </div>
         </div>
 
-        <!-- Previsualización del QR generado -->
-        {% if img_base64 %}
+        <!-- Previsualización de los QR generados -->
+        {% if qr_images %}
         <div class="row justify-content-center mt-4">
             <div class="col-md-6 text-center">
-                <h3>Previsualización del QR</h3>
-                <img src="data:image/png;base64,{{ img_base64 }}" alt="QR Code" class="img-fluid">
-                <form method="POST" action="/download_qr" class="mt-3">
-                    <input type="hidden" name="url" value="{{ request.form.url }}">
+                <h3>Previsualización de los QR Generados</h3>
+                {% for qr in qr_images %}
+                <div class="mb-3">
+                    <strong>URL:</strong> {{ qr.url }}
+                    <img src="data:image/png;base64,{{ qr.img_base64 }}" alt="QR Code" class="img-fluid">
+                </div>
+                {% endfor %}
+                <form method="POST" action="/download_zip">
+                    <input type="hidden" name="urls" value="{{ request.form.urls }}">
                     <input type="hidden" name="fill_color" value="{{ request.form.fill_color }}">
                     <input type="hidden" name="back_color" value="{{ request.form.back_color }}">
-                    <button type="submit" class="btn btn-success">Descargar QR</button>
+                    <button type="submit" class="btn btn-success">Descargar Todos los QR (ZIP)</button>
                 </form>
             </div>
         </div>
