@@ -1,46 +1,40 @@
 from flask import Flask, request, jsonify
-import pytesseract
 from PIL import Image
+import pytesseract
 import os
+import uuid
 
 app = Flask(__name__)
 
-# Ruta para subir y procesar la imagen
-UPLOAD_FOLDER = 'uploads/'
+# Configuración de la carpeta de almacenamiento de imágenes subidas
+UPLOAD_FOLDER = 'uploads'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Asegurarse de que exista la carpeta 'uploads'
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-
-@app.route('/upload', methods=['POST'])
-def upload_image():
+@app.route('/ocr', methods=['POST'])
+def ocr_text():
     if 'image' not in request.files:
-        return jsonify({"error": "No se envió ninguna imagen"}), 400
+        return jsonify({'error': 'No image provided'}), 400
 
-    file = request.files['image']
-    if file.filename == '':
-        return jsonify({"error": "Nombre de archivo vacío"}), 400
+    image_file = request.files['image']
+    if image_file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
 
-    # Guardar la imagen en el servidor
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-    file.save(filepath)
+    # Guarda la imagen en la carpeta de uploads
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{uuid.uuid4()}.png")
+    image_file.save(file_path)
 
-    # Abrir y procesar la imagen con Tesseract
-    text = extract_text_from_image(filepath)
-
-    # Eliminar el archivo después del procesamiento
-    os.remove(filepath)
-
-    return jsonify({"text": text})
-
-def extract_text_from_image(image_path):
     try:
-        img = Image.open(image_path)
-        text = pytesseract.image_to_string(img)
-        return text
+        # Abre la imagen y usa Tesseract para extraer texto
+        image = Image.open(file_path)
+        text = pytesseract.image_to_string(image)
+
+        # Elimina la imagen después de procesar
+        os.remove(file_path)
+
+        return jsonify({'text': text})
     except Exception as e:
-        return f"Error procesando la imagen: {e}"
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
