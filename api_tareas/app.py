@@ -1,55 +1,61 @@
 from flask import Flask, jsonify, request
+from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tasks.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
 
-# Lista de tareas simulada
-tareas = [
-    {'id': 1, 'titulo': 'Estudiar para examen', 'completada': False},
-    {'id': 2, 'titulo': 'Ir al supermercado', 'completada': False}
-]
+class Task(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.String(200), nullable=True)
+    completed = db.Column(db.Boolean, default=False)
+
+# Crear la base de datos y la tabla
+@app.before_first_request
+def create_tables():
+    db.create_all()
 
 # Obtener todas las tareas
-@app.route('/tareas', methods=['GET'])
-def obtener_tareas():
-    return jsonify(tareas)
+@app.route('/tasks', methods=['GET'])
+def get_tasks():
+    tasks = Task.query.all()
+    return jsonify([{'id': t.id, 'title': t.title, 'description': t.description, 'completed': t.completed} for t in tasks])
 
-# Obtener una tarea por su ID
-@app.route('/tareas/<int:tarea_id>', methods=['GET'])
-def obtener_tarea(tarea_id):
-    tarea = next((tarea for tarea in tareas if tarea['id'] == tarea_id), None)
-    if tarea:
-        return jsonify(tarea)
-    return jsonify({'mensaje': 'Tarea no encontrada'}), 404
+# Obtener una tarea por ID
+@app.route('/tasks/<int:id>', methods=['GET'])
+def get_task(id):
+    task = Task.query.get_or_404(id)
+    return jsonify({'id': task.id, 'title': task.title, 'description': task.description, 'completed': task.completed})
 
-# Crear una nueva tarea
-@app.route('/tareas', methods=['POST'])
-def crear_tarea():
-    nueva_tarea = {
-        'id': len(tareas) + 1,
-        'titulo': request.json['titulo'],
-        'completada': False
-    }
-    tareas.append(nueva_tarea)
-    return jsonify(nueva_tarea), 201
+# Agregar una nueva tarea
+@app.route('/tasks', methods=['POST'])
+def add_task():
+    data = request.json
+    new_task = Task(title=data['title'], description=data.get('description'))
+    db.session.add(new_task)
+    db.session.commit()
+    return jsonify({'message': 'Tarea agregada exitosamente'}), 201
 
 # Actualizar una tarea
-@app.route('/tareas/<int:tarea_id>', methods=['PUT'])
-def actualizar_tarea(tarea_id):
-    tarea = next((tarea for tarea in tareas if tarea['id'] == tarea_id), None)
-    if tarea:
-        tarea['titulo'] = request.json.get('titulo', tarea['titulo'])
-        tarea['completada'] = request.json.get('completada', tarea['completada'])
-        return jsonify(tarea)
-    return jsonify({'mensaje': 'Tarea no encontrada'}), 404
+@app.route('/tasks/<int:id>', methods=['PUT'])
+def update_task(id):
+    task = Task.query.get_or_404(id)
+    data = request.json
+    task.title = data['title']
+    task.description = data.get('description', task.description)
+    task.completed = data.get('completed', task.completed)
+    db.session.commit()
+    return jsonify({'message': 'Tarea actualizada exitosamente'})
 
 # Eliminar una tarea
-@app.route('/tareas/<int:tarea_id>', methods=['DELETE'])
-def eliminar_tarea(tarea_id):
-    tarea = next((tarea for tarea in tareas if tarea['id'] == tarea_id), None)
-    if tarea:
-        tareas.remove(tarea)
-        return jsonify({'mensaje': 'Tarea eliminada'})
-    return jsonify({'mensaje': 'Tarea no encontrada'}), 404
+@app.route('/tasks/<int:id>', methods=['DELETE'])
+def delete_task(id):
+    task = Task.query.get_or_404(id)
+    db.session.delete(task)
+    db.session.commit()
+    return jsonify({'message': 'Tarea eliminada exitosamente'})
 
 if __name__ == '__main__':
     app.run(debug=True)
