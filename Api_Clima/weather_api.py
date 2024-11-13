@@ -1,43 +1,82 @@
 from flask import Flask, request, jsonify
 import requests
-import os
 
 app = Flask(__name__)
 
-# Reemplaza 'YOUR_API_KEY' con tu clave de API de OpenWeatherMap
-API_KEY = 'YOUR_API_KEY'
-BASE_URL = 'https://api.openweathermap.org/data/2.5/weather'
+API_KEY = "YOUR_API_KEY"  # Reemplaza con tu API Key de OpenWeatherMap
+BASE_URL = "http://api.openweathermap.org/data/2.5/"
 
-@app.route('/weather', methods=['GET'])
-def get_weather():
-    city = request.args.get('city')
-    if not city:
-        return jsonify({'error': 'Please provide a city parameter'}), 400
+# Ruta para obtener el clima actual de una ciudad
+@app.route('/clima/actual', methods=['GET'])
+def clima_actual():
+    ciudad = request.args.get('ciudad')
+    if not ciudad:
+        return jsonify({"error": "Por favor proporciona una ciudad"}), 400
 
-    # Llamada a la API de OpenWeatherMap
-    params = {
-        'q': city,
-        'appid': API_KEY,
-        'units': 'metric'  # Cambiar a 'imperial' para grados Fahrenheit
-    }
+    try:
+        response = requests.get(f"{BASE_URL}weather", params={
+            'q': ciudad,
+            'appid': API_KEY,
+            'units': 'metric',
+            'lang': 'es'
+        })
+        data = response.json()
+        
+        if response.status_code != 200:
+            return jsonify({"error": data.get("message", "Error desconocido")}), response.status_code
 
-    response = requests.get(BASE_URL, params=params)
+        clima = {
+            "ciudad": data['name'],
+            "temperatura": data['main']['temp'],
+            "descripcion": data['weather'][0]['description'],
+            "humedad": data['main']['humidity'],
+            "viento": data['wind']['speed']
+        }
+        return jsonify(clima)
+    except Exception as e:
+        return jsonify({"error": "Hubo un problema al obtener el clima actual"}), 500
 
-    # Verifica si la respuesta es válida
-    if response.status_code != 200:
-        return jsonify({'error': 'City not found or API error occurred'}), response.status_code
 
-    # Procesa y estructura los datos en un JSON sencillo
-    data = response.json()
-    weather_data = {
-        'city': data['name'],
-        'temperature': data['main']['temp'],
-        'description': data['weather'][0]['description'],
-        'humidity': data['main']['humidity'],
-        'wind_speed': data['wind']['speed']
-    }
+# Ruta para obtener el pronóstico extendido (por 5 días)
+@app.route('/clima/pronostico', methods=['GET'])
+def pronostico():
+    ciudad = request.args.get('ciudad')
+    if not ciudad:
+        return jsonify({"error": "Por favor proporciona una ciudad"}), 400
 
-    return jsonify(weather_data)
+    try:
+        response = requests.get(f"{BASE_URL}forecast", params={
+            'q': ciudad,
+            'appid': API_KEY,
+            'units': 'metric',
+            'lang': 'es'
+        })
+        data = response.json()
 
+        if response.status_code != 200:
+            return jsonify({"error": data.get("message", "Error desconocido")}), response.status_code
+
+        pronostico = []
+        for item in data['list']:
+            pronostico.append({
+                "fecha": item['dt_txt'],
+                "temperatura": item['main']['temp'],
+                "descripcion": item['weather'][0]['description'],
+                "humedad": item['main']['humidity'],
+                "viento": item['wind']['speed']
+            })
+
+        return jsonify({"ciudad": data['city']['name'], "pronostico": pronostico})
+    except Exception as e:
+        return jsonify({"error": "Hubo un problema al obtener el pronóstico"}), 500
+
+
+# Ruta de error 404
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({"error": "Recurso no encontrado"}), 404
+
+
+# Iniciar la API
 if __name__ == '__main__':
     app.run(debug=True)
